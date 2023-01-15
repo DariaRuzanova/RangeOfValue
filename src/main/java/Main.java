@@ -1,8 +1,10 @@
 import java.util.*;
+import java.util.concurrent.*;
+import java.util.function.IntBinaryOperator;
 
 public class Main {
 
-    public static void main(String[] args) throws InterruptedException {
+    public static void main(String[] args) throws InterruptedException, ExecutionException {
         String[] texts = new String[25];
         for (int i = 0; i < texts.length; i++) {
             texts[i] = generateText("aab", 30_000);
@@ -10,10 +12,12 @@ public class Main {
 
         long startTs = System.currentTimeMillis(); // start time
 
-        List<Thread> threads = new ArrayList<>();
+        final ExecutorService threadPool = Executors.newFixedThreadPool(4);
+
+        List<Future<Integer>> threads = new ArrayList<>();
 
         for (String text : texts) {
-            Runnable task = () -> {
+            Callable<Integer> myCallable = () -> {
                 int maxSize = 0;
                 for (int i = 0; i < text.length(); i++) {
                     for (int j = 0; j < text.length(); j++) {
@@ -33,14 +37,22 @@ public class Main {
                     }
                 }
                 System.out.println(text.substring(0, 100) + " -> " + maxSize);
+                return maxSize;
             };
-            Thread thread = new Thread(task);
-            threads.add(thread);
-            thread.start();
+            Future<Integer> task = threadPool.submit(myCallable);
+            threads.add(task);
+
         }
-        for (Thread thread : threads) {
-            thread.join(); // зависаем, ждём когда поток, объект которого лежит в thread завершится
+
+        int maxValue = 0;
+        for (Future<Integer>thread : threads) {
+            int result = thread.get();
+            if(maxValue<result){
+                maxValue=result;
+            }
         }
+        System.out.println("Максимальный интервал значений среди всех строк: "+maxValue);
+        threadPool.shutdown();
         long endTs = System.currentTimeMillis(); // end time
 
         System.out.println("Time: " + (endTs - startTs) + "ms");
